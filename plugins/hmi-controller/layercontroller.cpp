@@ -74,7 +74,12 @@ LayerController::LayerController(AppManager &appManager) :
     m_appWidth(0),
     m_appHeight(0),
     m_launcherPid(0),
-    m_backgroundSurfaceId(0),
+    // INVALID_ID can be passed to automatically generate layer ID, but
+    // this member is also redefined by the main program through a call to
+    // setBackgroundSurfaceId().  This might still need some cleanup. 
+    // Since any other number is valid, it should likely be initialized to
+    // INVALID_ID regardless.
+    m_backgroundSurfaceId(INVALID_ID),
     m_currentLayer(0),
     m_launcherOnTop(true)
 {
@@ -359,7 +364,7 @@ void LayerController::setLayerVisible(unsigned int layerId)
     ilm_commitChanges();
 }
 
-bool LayerController::createLayer(unsigned int layerId)
+bool LayerController::createLayer(unsigned int &layerId)
 {
     ilmErrorTypes callResult = ILM_FAILED;
     callResult = ilm_layerCreateWithDimension(&layerId, m_screenWidth, m_screenHeight);
@@ -615,7 +620,18 @@ void LayerController::addAppProcess(const AppManager::AppInfo app, const pid_t p
     pinfo.surfaceList = {};
 
     // Create layer for new app
-    createLayer(pid);
+
+    // We need a new variable because gcc is picky with having a true lvalue
+    // for the non-const pass by reference, and not pid which is an rvalue.
+    // (createLayer will modify the input variable to the layer ID that was
+    // actually chosen.  In this case it should be always what we asked
+    // for, but it can be dynamic in other cases)
+    unsigned int layerId = pid;
+    createLayer(layerId /*by reference*/);
+
+    // FIXME: This could use an assert(layerId == pid) and also error 
+    // checking (createLayer should return true).
+    // but this is a quick fix - changing as little as possible.
 
     m_processMap[pid]= pinfo;
 }
