@@ -36,6 +36,10 @@ static void surfaceCallbackFunction(t_ilm_uint id, struct ilmSurfaceProperties* 
 {
     if ((unsigned)m & ILM_NOTIFICATION_CONFIGURED)
     {
+
+       if (sp->creatorPid == 0)
+          printf("LayerController/surfaceCallbackFunction: PID is zero!\n");
+
         QMetaObject::invokeMethod(SELF, "surfaceConfiguredCallback_onGuiThread",
                                   Qt::QueuedConnection,
                                   Q_ARG(unsigned int, id),
@@ -74,12 +78,7 @@ LayerController::LayerController(AppManager &appManager) :
     m_appWidth(0),
     m_appHeight(0),
     m_launcherPid(0),
-    // INVALID_ID can be passed to automatically generate layer ID, but
-    // this member is also redefined by the main program through a call to
-    // setBackgroundSurfaceId().  This might still need some cleanup. 
-    // Since any other number is valid, it should likely be initialized to
-    // INVALID_ID regardless.
-    m_backgroundSurfaceId(INVALID_ID),
+    m_backgroundSurfaceId(0),
     m_currentLayer(0),
     m_launcherOnTop(true)
 {
@@ -449,6 +448,7 @@ void LayerController::addSurface(unsigned int surfaceId)
 
         // Create layer for new app
         unsigned int layerId = newInfo.processId;
+        printf("LayerController::addSurface, surfaceId=%d -- calling createLayer with layerId(processId) = %d\n", surfaceId);
         createLayer(layerId);
     }
     processInfo->graphicProcessId = props.creatorPid;
@@ -520,7 +520,10 @@ void LayerController::surfaceCallback_onGuiThread(unsigned int surfaceId, bool c
         struct ilmSurfaceProperties props;
         ilm_getPropertiesOfSurface(surfaceId, &props);
         if (props.origSourceWidth != 0 && props.origSourceHeight != 0)
-            addSurface(surfaceId);
+        {
+           printf("Calling addSurface with surfaceId=%d, onGuiThread\n",surfaceId);
+           addSurface(surfaceId);
+        }
     }
     else {
         removeSurface(surfaceId);
@@ -534,11 +537,16 @@ void LayerController::surfaceConfiguredCallback_onGuiThread(unsigned int surface
     if (info == nullptr ||
         std::find(info->surfaceList.begin(), info->surfaceList.end(), surfaceId) == info->surfaceList.end())
     {
-        addSurface(surfaceId);
+       printf("New surface in LayerController::surfaceConfiguredCallback_onGuiThread, surfaceId=%d, pid=%d\n",surfaceId, pid);
+       addSurface(surfaceId);
     }
     else
     { // Simple resize
-        //TODO why does pid return 0 for the launcher surfaces during the callback?
+       //TODO why does pid return 0 for the launcher surfaces during the callback?
+       printf("Resize in LayerController::surfaceConfiguredCallback_onGuiThread, surfaceId=%d, pid=%d\n",surfaceId, pid);
+       if (pid == 0)
+          printf("LayerController::surfaceConfiguredCallback_onGuiThread: PID is zero!\n");
+
         if (pid == m_launcherPid || pid == 0)
             resizeFullScreenSurface(surfaceId);
         else
@@ -627,7 +635,10 @@ void LayerController::addAppProcess(const AppManager::AppInfo app, const pid_t p
     // actually chosen.  In this case it should be always what we asked
     // for, but it can be dynamic in other cases)
     unsigned int layerId = pid;
-    createLayer(layerId /*by reference*/);
+    bool result = createLayer(layerId /*by reference*/);
+
+    printf("pid is %d and layerId was set to %d\n",pid, layerId);
+    printf("createLayer returned result %d\n", (int)result);
 
     // FIXME: This could use an assert(layerId == pid) and also error 
     // checking (createLayer should return true).
