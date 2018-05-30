@@ -15,7 +15,7 @@ HMIController::HMIController(QObject *parent) :
     m_lucFile("lastUserContext")
 {
     m_layerController.setLauncherPid(getpid());
-    m_layerController.setBackgroundSurfaceId(0); //TODO test more
+    m_layerController.setBackgroundSurfaceId(12345678); //TODO test more
 
     connect(&m_layerController, &LayerController::currentAppIDChanged,
             this, &HMIController::appIsDisplayedChanged);
